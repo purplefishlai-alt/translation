@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PolyGlot AI - 雙語翻譯與當地專有名詞校對機器人</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans TC', 'Noto Sans JP', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f6ff',
+                            100: '#e0edff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(71, 85, 105, 1);
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-slate-200 bg-slate-950 selection:bg-brand-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fa-solid font-bold fa-language text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white flex items-center gap-2">
+                        PolyGlot AI 翻譯機器人
+                        <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Gemini 3 Flash</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">英日雙語翻譯 • 當地化專有名詞精準校對</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Controls -->
+            <div class="flex items-center space-x-3 text-sm">
+                <button id="btn-api-key" onclick="toggleApiKeyModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-key text-amber-400"></i>
+                    <span>API Key 設定</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application Container (Two-Column Layout: Left = Input/Terms, Right = Translations) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- LEFT COLUMN: Input, Presets & Terminology Verification Table -->
+            <div class="lg:col-span-6 flex flex-col gap-6">
+
+                <!-- Preset Scenario Buttons -->
+                <div class="flex flex-col gap-2 bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/80 text-xs">
+                    <div class="flex items-center gap-2 text-slate-300 font-medium">
+                        <i class="fa-solid fa-lightbulb text-amber-400"></i>
+                        <span>快速載入範例情境：</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button onclick="loadPreset('tech')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-microchip text-blue-400"></i> 科技新聞與AI
+                        </button>
+                        <button onclick="loadPreset('legal')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-file-contract text-emerald-400"></i> 商業合約與法規
+                        </button>
+                        <button onclick="loadPreset('anime')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition flex items-center gap-1">
+                            <i class="fa-solid fa-gamepad text-purple-400"></i> ACG動漫與流行語
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Section -->
+                <div class="glass-panel rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                            <h2 class="font-semibold text-white">1. 輸入原文或上傳文件</h2>
+                        </div>
+                        
+                        <div class="flex items-center gap-2">
+                            <label class="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-cloud-arrow-up text-blue-400"></i>
+                                <span id="file-label">上傳檔案</span>
+                                <input type="file" id="file-input" accept=".txt,.md,.json,.csv" class="hidden" onchange="handleFileUpload(event)">
+                            </label>
+                            
+                            <button onclick="clearAll()" class="px-2 py-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 text-xs transition" title="清除內容">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Text Area -->
+                    <div class="relative">
+                        <textarea id="source-text" rows="6" class="w-full bg-slate-950/80 text-slate-100 rounded-xl p-4 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition resize-y font-sans text-sm leading-relaxed" placeholder="請在此貼上欲翻譯的文字，或拖曳上傳文字檔案...&#10;系統將自動擷取品牌名稱、技術用語、文化俚語等專有名詞，提供美日在地慣用譯法。"></textarea>
+                        <div class="absolute bottom-3 right-3 text-xs text-slate-500 pointer-events-none" id="char-count">0 字</div>
+                    </div>
+
+                    <!-- Primary Action Buttons -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-1">
+                        <button id="btn-extract-terms" onclick="extractTerms()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-400 font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-md">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>分析專有名詞建議表</span>
+                        </button>
+
+                        <button id="btn-translate-all" onclick="translateDirectly()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-blue-600/25">
+                            <i class="fa-solid fa-language"></i>
+                            <span>執行英日雙語翻譯</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Localized Terminology Confirmation Table Section -->
+                <div id="terms-section" class="glass-panel rounded-2xl p-5 border border-indigo-500/30 bg-slate-900/90 shadow-2xl flex flex-col gap-4 hidden">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
+                                <i class="fa-solid fa-list-check"></i>
+                            </span>
+                            <div>
+                                <h3 class="font-semibold text-white">2. 專有名詞與當地慣用語建議表</h3>
+                                <p class="text-xs text-slate-400">請確認或修改下方譯名，翻譯引擎將強制採用您的對照表。</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="addCustomTermRow()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 flex items-center gap-1 transition">
+                                <i class="fa-solid fa-plus text-emerald-400"></i> 新增
+                            </button>
+                            <button onclick="confirmTermsAndTranslate()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition shadow-md">
+                                <i class="fa-solid fa-check"></i> 確認並翻譯
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table Area -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-800 max-h-[350px]">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800 sticky top-0 z-10">
+                                <tr>
+                                    <th scope="col" class="py-2.5 px-3 w-1/4">原文</th>
+                                    <th scope="col" class="py-2.5 px-3 w-1/3">英文當地建議 (US/UK)</th>
+                                    <th scope="col" class="py-2.5 px-3 w-1/3">日文當地建議 (Japan)</th>
+                                    <th scope="col" class="py-2.5 px-1 text-center w-8">刪除</th>
+                                </tr>
+                            </thead>
+                            <tbody id="terms-tbody" class="divide-y divide-slate-800/60 bg-slate-900/50">
+                                <!-- Dynamic rows inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Dual Output Windows (English & Japanese Translations) -->
+            <div id="translation-results" class="lg:col-span-6 flex flex-col gap-6">
+
+                <!-- English Translation Window Card -->
+                <div class="glass-panel rounded-2xl p-5 flex flex-col gap-3 shadow-xl border-t-4 border-t-blue-500">
+                    <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🇺🇸 / 🇬🇧</span>
+                            <h3 class="font-semibold text-white text-sm">英文翻譯 (English Translation)</h3>
+                        </div>
+
+                        <!-- Audio & Toolbar Controls -->
+                        <div class="flex items-center gap-1.5">
+                            <!-- Play / Pause Button -->
+                            <button id="btn-play-en" onclick="togglePlayPause('en')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-play"></i> <span>朗讀</span>
+                            </button>
+                            <!-- Replay Button -->
+                            <button id="btn-replay-en" onclick="replayAudio('en')" title="重複播放" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-rotate-right"></i>
+                            </button>
+                            <!-- Stop Button -->
+                            <button id="btn-stop-en" onclick="stopAudio('en')" title="停止播放" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-square"></i>
+                            </button>
+
+                            <div class="h-4 w-px bg-slate-800 mx-0.5"></div>
+
+                            <button onclick="copyToClipboard('english-output')" title="複製譯文" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                            <button onclick="downloadText('English_Translation.txt', 'english-output')" title="下載檔案" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="english-output" class="bg-slate-950/80 rounded-xl p-4 border border-slate-800 text-slate-200 min-h-[160px] max-h-[300px] overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap selection:bg-blue-500">
+                        <span class="text-slate-500 italic">請於左側點擊「執行英日雙語翻譯」...</span>
+                    </div>
+
+                    <div class="text-xs text-slate-500 flex justify-between items-center pt-1 border-t border-slate-800/40">
+                        <div id="audio-status-en" class="text-xs text-slate-500 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-slate-500"></span> 未播放
+                        </div>
+                        <span id="en-char-count">0 字</span>
+                    </div>
+                </div>
+
+                <!-- Japanese Translation Window Card -->
+                <div class="glass-panel rounded-2xl p-5 flex flex-col gap-3 shadow-xl border-t-4 border-t-rose-500">
+                    <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🇯🇵</span>
+                            <h3 class="font-semibold text-white text-sm">日文翻譯 (日本語翻訳)</h3>
+                        </div>
+
+                        <!-- Audio & Toolbar Controls -->
+                        <div class="flex items-center gap-1.5">
+                            <!-- Play / Pause Button -->
+                            <button id="btn-play-ja" onclick="togglePlayPause('ja')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition">
+                                <i class="fa-solid fa-play"></i> <span>朗讀</span>
+                            </button>
+                            <!-- Replay Button -->
+                            <button id="btn-replay-ja" onclick="replayAudio('ja')" title="重複播放" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-rotate-right"></i>
+                            </button>
+                            <!-- Stop Button -->
+                            <button id="btn-stop-ja" onclick="stopAudio('ja')" title="停止播放" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-square"></i>
+                            </button>
+
+                            <div class="h-4 w-px bg-slate-800 mx-0.5"></div>
+
+                            <button onclick="copyToClipboard('japanese-output')" title="複製譯文" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                            <button onclick="downloadText('Japanese_Translation.txt', 'japanese-output')" title="下載檔案" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="japanese-output" class="bg-slate-950/80 rounded-xl p-4 border border-slate-800 text-slate-200 min-h-[160px] max-h-[300px] overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap selection:bg-rose-500 font-sans">
+                        <span class="text-slate-500 italic">翻訳待機中...</span>
+                    </div>
+
+                    <div class="text-xs text-slate-500 flex justify-between items-center pt-1 border-t border-slate-800/40">
+                        <div id="audio-status-ja" class="text-xs text-slate-500 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-slate-500"></span> 未播放
+                        </div>
+                        <span id="jp-char-count">0 字</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4 text-center">
+            <div class="relative w-16 h-16 mb-4">
+                <div class="absolute inset-0 rounded-full border-4 border-blue-500/20"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <i class="fa-solid fa-language text-blue-400 text-xl"></i>
+                </div>
+            </div>
+            <h4 id="loading-title" class="font-bold text-white mb-1">正在分析專有名詞...</h4>
+            <p id="loading-subtitle" class="text-xs text-slate-400">Gemini AI 正在為您搜尋美/日當地的標準慣用譯法</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- API Key Modal -->
+    <div id="api-key-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+                <h3 class="font-semibold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-key text-amber-400"></i> API Key 設定
+                </h3>
+                <button onclick="toggleApiKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">
+                預設環境已整合 Gemini 3 Flash API。若您有自己的 Google Gemini API Key，可於此輸入進行替換：
+            </p>
+            <input type="password" id="custom-api-key" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 mb-4 focus:outline-none focus:border-blue-500">
+            <div class="flex justify-end gap-2">
+                <button onclick="toggleApiKeyModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs">取消</button>
+                <button onclick="saveApiKey()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium">儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-auto border-t border-slate-800/80 bg-slate-950 py-4 text-center text-xs text-slate-500">
+        PolyGlot AI Localized Translation Engine • Grounded with Gemini 3 Flash
+    </footer>
+
+    <script>
+        // Application State
+        let customApiKey = localStorage.getItem('gemini_api_key') || '';
+        let extractedTerms = [];
+
+        // Speech Synthesis Audio States
+        let audioState = {
+            en: { utterance: null, isSpeaking: false, isPaused: false },
+            ja: { utterance: null, isSpeaking: false, isPaused: false }
+        };
+
+        // Sample Presets
+        const PRESETS = {
+            tech: `蘋果公司 (Apple) 在其最新的 WWDC 大會上發布了全新代號為 Vision Pro 的空間運算裝置，並大幅升級了 Siri 語音助理的 LLM 大型語言模型架構。此舉標誌著軟體巨擘正式全面進軍生成式 AI (Generative AI) 與虛擬實境市場。許多矽谷創投 (VC) 表示這將徹底改變軟體開發者 (Software Engineers) 的生態系。`,
+            
+            legal: `根據本保密協議 (Non-Disclosure Agreement, NDA) 之規定，乙方在未取得甲方事前書面同意前，不得將受保護之商業機密 (Trade Secrets) 或智慧財產權 (Intellectual Property) 洩露予任何第三方。本合約之解釋與適用，均以中華民國法律為準據法，並以臺灣臺北地方法院為第一審管轄法院。`,
+            
+            anime: `最近爆紅的霸權動畫《葬送的芙莉蓮》中，主角芙莉蓮身為長壽的精靈族魔法使，在討伐魔王後的後日談冒險十分治癒。劇中的「斷頭台的阿烏拉」與防禦魔法對決場面引起社群瘋狂創作迷因 (Memes)。許多宅男宅女 (Otaku) 紛紛在 X (原 Twitter) 上刷爆「聖地巡禮」與「週邊商品」開箱影片。`
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const sourceText = document.getElementById('source-text');
+            sourceText.addEventListener('input', () => {
+                document.getElementById('char-count').innerText = `${sourceText.value.length} 字`;
+            });
+
+            if (customApiKey) {
+                document.getElementById('custom-api-key').value = customApiKey;
+            }
+        });
+
+        function loadPreset(key) {
+            if (PRESETS[key]) {
+                const sourceText = document.getElementById('source-text');
+                sourceText.value = PRESETS[key];
+                document.getElementById('char-count').innerText = `${sourceText.value.length} 字`;
+                showToast("已載入範例情境文字", "info");
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('source-text').value = '';
+            document.getElementById('char-count').innerText = '0 字';
+            document.getElementById('terms-section').classList.add('hidden');
+            document.getElementById('english-output').innerHTML = `<span class="text-slate-500 italic">請於左側點擊「執行英日雙語翻譯」...</span>`;
+            document.getElementById('japanese-output').innerHTML = `<span class="text-slate-500 italic">翻訳待機中...</span>`;
+            document.getElementById('en-char-count').innerText = `0 字`;
+            document.getElementById('jp-char-count').innerText = `0 字`;
+            stopAudio('en', false);
+            stopAudio('ja', false);
+            extractedTerms = [];
+            showToast("已清除所有內容", "info");
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('source-text').value = e.target.result;
+                document.getElementById('char-count').innerText = `${e.target.result.length} 字`;
+                document.getElementById('file-label').innerText = file.name;
+                showToast(`已成功載入檔案: ${file.name}`, "success");
+            };
+            reader.onerror = () => {
+                showToast("檔案讀取失敗", "error");
+            };
+            reader.readAsText(file);
+        }
+
+        // --- AUDIO SPEECH SYNTHESIS CONTROLS (PLAY, PAUSE, REPLAY, STOP) ---
+        function togglePlayPause(lang) {
+            const textId = lang === 'en' ? 'english-output' : 'japanese-output';
+            const text = document.getElementById(textId).innerText;
+
+            if (!text || text.includes("請於左側點擊") || text.includes("翻訳待機中")) {
+                showToast("尚無譯文內容可供朗讀", "warning");
+                return;
+            }
+
+            if (!('speechSynthesis' in window)) {
+                showToast("您的瀏覽器不支援語音朗讀功能", "warning");
+                return;
+            }
+
+            const state = audioState[lang];
+
+            // Currently playing -> Pause
+            if (state.isSpeaking && !state.isPaused) {
+                window.speechSynthesis.pause();
+                state.isPaused = true;
+                updateAudioUI(lang, 'paused');
+                showToast("已暫停朗讀", "info");
+                return;
+            }
+
+            // Currently paused -> Resume
+            if (state.isSpeaking && state.isPaused) {
+                window.speechSynthesis.resume();
+                state.isPaused = false;
+                updateAudioUI(lang, 'playing');
+                showToast("繼續播放語音", "info");
+                return;
+            }
+
+            // Otherwise start fresh play
+            stopAudio('en', false);
+            stopAudio('ja', false);
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang === 'en' ? 'en-US' : 'ja-JP';
+            utterance.rate = 0.95;
+
+            utterance.onend = () => {
+                state.isSpeaking = false;
+                state.isPaused = false;
+                updateAudioUI(lang, 'stopped');
+            };
+
+            utterance.onerror = () => {
+                state.isSpeaking = false;
+                state.isPaused = false;
+                updateAudioUI(lang, 'stopped');
+            };
+
+            utterance.onpause = () => {
+                state.isPaused = true;
+                updateAudioUI(lang, 'paused');
+            };
+
+            utterance.onresume = () => {
+                state.isPaused = false;
+                updateAudioUI(lang, 'playing');
+            };
+
+            state.utterance = utterance;
+            state.isSpeaking = true;
+            state.isPaused = false;
+
+            window.speechSynthesis.speak(utterance);
+            updateAudioUI(lang, 'playing');
+            showToast(`開始朗讀 (${utterance.lang})`, "info");
+        }
+
+        function replayAudio(lang) {
+            stopAudio(lang, false);
+            togglePlayPause(lang);
+        }
+
+        function stopAudio(lang, showNotification = true) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            const state = audioState[lang];
+            state.isSpeaking = false;
+            state.isPaused = false;
+            state.utterance = null;
+            updateAudioUI(lang, 'stopped');
+            if (showNotification) showToast("已停止朗讀", "info");
+        }
+
+        function updateAudioUI(lang, status) {
+            const playBtn = document.getElementById(`btn-play-${lang}`);
+            const statusBadge = document.getElementById(`audio-status-${lang}`);
+            if (!playBtn || !statusBadge) return;
+
+            if (status === 'playing') {
+                playBtn.innerHTML = `<i class="fa-solid fa-pause"></i> <span>暫停</span>`;
+                playBtn.className = "px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium flex items-center gap-1.5 transition shadow-sm";
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 播放中`;
+                statusBadge.className = "text-xs text-emerald-400 flex items-center gap-1 font-medium";
+            } else if (status === 'paused') {
+                playBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>繼續</span>`;
+                playBtn.className = "px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1.5 transition shadow-sm";
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> 已暫停`;
+                statusBadge.className = "text-xs text-amber-400 flex items-center gap-1 font-medium";
+            } else {
+                playBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>朗讀</span>`;
+                playBtn.className = "px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition border border-slate-700";
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-500"></span> 未播放`;
+                statusBadge.className = "text-xs text-slate-500 flex items-center gap-1";
+            }
+        }
+
+        // --- GEMINI API CALL HELPERS WITH RETRY & BACKOFF ---
+        async function fetchGeminiAPI(payload) {
+            const apiKey = customApiKey || "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const maxRetries = 3;
+            let delay = 1000;
+
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 429) {
+                            await new Promise(res => setTimeout(res, delay));
+                            delay *= 2;
+                            continue;
+                        }
+                        const errJson = await response.json().catch(() => ({}));
+                        throw new Error(errJson.error?.message || `HTTP Exception: ${response.status}`);
+                    }
+
+                    return await response.json();
+                } catch (err) {
+                    if (attempt === maxRetries - 1) throw err;
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        // --- STEP 1: EXTRACT PROPER NOUNS & LOCALIZATION SUGGESTIONS ---
+        async function extractTerms() {
+            const text = document.getElementById('source-text').value.trim();
+            if (!text) {
+                showToast("請輸入欲分析的文字或上傳檔案", "warning");
+                return;
+            }
+
+            showLoading("正在辨識專有名詞與搜尋當地譯法...", "分析品牌名稱、技術用語、文化俚語，準備美/日在地化翻譯建議");
+
+            const systemPrompt = `你是一位專業的國際語言翻譯與在地化學者。請分析使用者輸入的文本，找出文中所有的「專有名詞」、「品牌名稱」、「技術術語」、「文化俚語/流行語」或「法律/商業詞彙」。
+對於每一個專有名詞，請提供：
+1. 原文專有名詞 (original)
+2. 類別 (category): 例如 "品牌", "技術/AI", "法律/商業", "動漫/文化", "人名/地名"
+3. 美國/英國當地習慣譯法 (enTranslation)
+4. 日本當地習慣譯法 (jpTranslation)
+
+請務必嚴格以 JSON 格式回應。`;
+
+            const payload = {
+                contents: [{ parts: [{ text: text }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            terms: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        original: { type: "STRING" },
+                                        category: { type: "STRING" },
+                                        enTranslation: { type: "STRING" },
+                                        jpTranslation: { type: "STRING" }
+                                    },
+                                    required: ["original", "category", "enTranslation", "jpTranslation"]
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const data = await fetchGeminiAPI(payload);
+                const candidate = data.candidates?.[0];
+                if (candidate?.content?.parts?.[0]?.text) {
+                    const parsed = JSON.parse(candidate.content.parts[0].text);
+                    extractedTerms = parsed.terms || [];
+                    renderTermsTable(extractedTerms);
+                    document.getElementById('terms-section').classList.remove('hidden');
+                    showToast(`分析完成，共萃取出 ${extractedTerms.length} 個專有名詞`, "success");
+                } else {
+                    showToast("無法順利辨識專有名詞", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast(`專有名詞分析失敗: ${err.message}`, "error");
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Render Terminology Confirmation Table
+        function renderTermsTable(terms) {
+            const tbody = document.getElementById('terms-tbody');
+            tbody.innerHTML = '';
+
+            if (terms.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-4 text-center text-slate-500 italic">
+                            未偵測到專有名詞。您可點擊右上角「新增」手動建立對照表。
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            terms.forEach((term, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition group";
+                tr.innerHTML = `
+                    <td class="py-2 px-3 font-medium text-slate-200">
+                        <input type="text" value="${escapeHtml(term.original)}" onchange="updateTerm(${index}, 'original', this.value)" class="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500">
+                    </td>
+                    <td class="py-2 px-3">
+                        <input type="text" value="${escapeHtml(term.enTranslation)}" onchange="updateTerm(${index}, 'enTranslation', this.value)" class="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-1 text-xs text-blue-300 font-medium focus:outline-none focus:border-blue-500">
+                    </td>
+                    <td class="py-2 px-3">
+                        <input type="text" value="${escapeHtml(term.jpTranslation)}" onchange="updateTerm(${index}, 'jpTranslation', this.value)" class="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-1 text-xs text-rose-300 font-medium focus:outline-none focus:border-rose-500">
+                    </td>
+                    <td class="py-2 px-1 text-center">
+                        <button onclick="deleteTermRow(${index})" class="text-slate-500 hover:text-rose-400 transition p-1" title="刪除">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateTerm(index, key, val) {
+            if (extractedTerms[index]) {
+                extractedTerms[index][key] = val;
+            }
+        }
+
+        function deleteTermRow(index) {
+            extractedTerms.splice(index, 1);
+            renderTermsTable(extractedTerms);
+            showToast("已移除項目", "info");
+        }
+
+        function addCustomTermRow() {
+            extractedTerms.unshift({
+                original: "自訂詞彙",
+                category: "自訂",
+                enTranslation: "Custom Term",
+                jpTranslation: "カスタム用語"
+            });
+            renderTermsTable(extractedTerms);
+        }
+
+        // --- STEP 2: FULL DUAL TRANSLATION EXECUTION ---
+        function confirmTermsAndTranslate() {
+            executeFullTranslation();
+        }
+
+        function translateDirectly() {
+            executeFullTranslation();
+        }
+
+        async function executeFullTranslation() {
+            const text = document.getElementById('source-text').value.trim();
+            if (!text) {
+                showToast("請輸入欲翻譯的文字", "warning");
+                return;
+            }
+
+            showLoading("正在執行雙語翻譯...", "依據確認的專有名詞對照表，為您產出自然流暢的美式英文與標準日文");
+
+            // Format Glossary Rules
+            let glossaryPrompt = "";
+            if (extractedTerms.length > 0) {
+                glossaryPrompt = "\n【必須嚴格遵守的專有名詞對照表 (Terminology Glossary)】:\n";
+                extractedTerms.forEach(t => {
+                    if (t.original && (t.enTranslation || t.jpTranslation)) {
+                        glossaryPrompt += `- 原文: "${t.original}" -> 英文必須譯為: "${t.enTranslation}", 日文必須譯為: "${t.jpTranslation}"\n`;
+                    }
+                });
+            }
+
+            const systemPrompt = `你是一位精通多國語言在地化的頂級翻譯專家。請將使用者的原文分別翻譯成「英文 (English)」與「日文 (日本語)」。
+需求細節：
+1. 英文翻譯：語言風格需符合英語系國家（美國/英國）當地自然習慣語感，避免僵硬直譯。
+2. 日文翻譯：請使用自然優美的標準敬語體（です/ます調），並正確使用日本在地的外來語片假名與習慣漢字表記。
+3. 專有名詞：若提供專有名詞對照表，必須完全符合表中指定譯法。${glossaryPrompt}
+
+請嚴格輸出 JSON 格式。`;
+
+            const payload = {
+                contents: [{ parts: [{ text: text }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            englishTranslation: { type: "STRING" },
+                            japaneseTranslation: { type: "STRING" }
+                        },
+                        required: ["englishTranslation", "japaneseTranslation"]
+                    }
+                }
+            };
+
+            try {
+                const data = await fetchGeminiAPI(payload);
+                const candidate = data.candidates?.[0];
+
+                if (candidate?.content?.parts?.[0]?.text) {
+                    const result = JSON.parse(candidate.content.parts[0].text);
+
+                    // Stop existing audio playbacks
+                    stopAudio('en', false);
+                    stopAudio('ja', false);
+
+                    // Display Results
+                    const enOutput = document.getElementById('english-output');
+                    const jpOutput = document.getElementById('japanese-output');
+
+                    enOutput.innerText = result.englishTranslation;
+                    jpOutput.innerText = result.japaneseTranslation;
+
+                    document.getElementById('en-char-count').innerText = `${result.englishTranslation.length} 字`;
+                    document.getElementById('jp-char-count').innerText = `${result.japaneseTranslation.length} 字`;
+
+                    showToast("英日文翻譯完成！", "success");
+                } else {
+                    showToast("翻譯回應格式不符", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast(`翻譯失敗: ${err.message}`, "error");
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // --- UTILITY FUNCTIONS ---
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            if (!text || text.includes("請於左側點擊") || text.includes("翻訳待機中")) {
+                showToast("無可複製的文字", "warning");
+                return;
+            }
+
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                showToast("已成功複製至剪貼簿！", "success");
+            } catch (err) {
+                showToast("複製失敗，請手動選取複製", "error");
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+
+        function downloadText(filename, elementId) {
+            const text = document.getElementById(elementId).innerText;
+            if (!text || text.includes("請於左側點擊") || text.includes("翻訳待機中")) {
+                showToast("無內容可供下載", "warning");
+                return;
+            }
+
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`已下載 ${filename}`, "info");
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/"/g, "&quot;")
+                      .replace(/'/g, "&#039;");
+        }
+
+        // Modal & Toast Handlers
+        function showLoading(title, subtitle) {
+            document.getElementById('loading-title').innerText = title;
+            document.getElementById('loading-subtitle').innerText = subtitle;
+            document.getElementById('loading-overlay').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.add('hidden');
+        }
+
+        function toggleApiKeyModal() {
+            const modal = document.getElementById('api-key-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function saveApiKey() {
+            const val = document.getElementById('custom-api-key').value.trim();
+            customApiKey = val;
+            if (val) {
+                localStorage.setItem('gemini_api_key', val);
+                showToast("已儲存自訂 API Key", "success");
+            } else {
+                localStorage.removeItem('gemini_api_key');
+                showToast("已恢復使用預設 API Key", "info");
+            }
+            toggleApiKeyModal();
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const bgMap = {
+                success: "bg-emerald-900/90 border-emerald-500 text-emerald-200",
+                error: "bg-rose-900/90 border-rose-500 text-rose-200",
+                warning: "bg-amber-900/90 border-amber-500 text-amber-200",
+                info: "bg-slate-800/90 border-slate-600 text-slate-200"
+            };
+
+            const iconMap = {
+                success: "fa-circle-check text-emerald-400",
+                error: "fa-circle-xmark text-rose-400",
+                warning: "fa-triangle-exclamation text-amber-400",
+                info: "fa-circle-info text-blue-400"
+            };
+
+            toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs backdrop-blur-md transition-all transform translate-y-2 opacity-0 pointer-events-auto ${bgMap[type] || bgMap.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${iconMap[type] || iconMap.info}"></i>
+                <span class="font-medium">${escapeHtml(message)}</span>
+            `;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
